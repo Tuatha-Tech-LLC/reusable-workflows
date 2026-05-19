@@ -1,0 +1,67 @@
+name: "Detect Runner"
+
+on:
+  workflow_call:
+    inputs:
+      primary-runner:
+        description: "Primary runner label(s), comma-separated (e.g. 'self-hosted,Linux')"
+        type: string
+        required: false
+        default: "self-hosted,Linux"
+      fallback-runner:
+        description: "Fallback runner if primary is unavailable (e.g. 'ubuntu-latest')"
+        type: string
+        required: false
+        default: "ubuntu-latest"
+      github-pat-token:
+        description: "Personal Access Token for GitHub"
+        type: string
+        required: false
+    outputs:
+      runner:
+        description: "JSON runner label array (primary or fallback)"
+        value: ${{ jobs.detect.outputs.runner }}
+
+env:
+  OP_CONNECT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+  GITHUB_PAT_TOKEN: ${{ inputs.github-pat-token }}
+
+jobs:
+  detect:
+    # Run on self-hosted so this scheduler step does not depend on
+    # GitHub-hosted runner minutes / billing. If every self-hosted runner
+    # is offline we can't run any downstream job anyway, so deferring the
+    # detect step until one comes back online is the right behaviour.
+    runs-on: [self-hosted, Linux]
+    outputs:
+      runner: ${{ steps.set-runner.outputs.use-runner }}
+    steps:
+      - name: Configure 1Password Connect
+        if: env.OP_CONNECT_TOKEN != '' && env.GITHUB_PAT_TOKEN == ''
+        uses: 1password/load-secrets-action/configure@v3
+        with:
+          connect-host: ${{ vars.FA_OP_CONNECT_HOST }}
+          connect-token: ${{ env.OP_CONNECT_TOKEN }}
+
+      - name: Configure 1Password Service Account (fallback)
+        if: env.OP_CONNECT_TOKEN == '' && env.GITHUB_PAT_TOKEN == ''
+        uses: 1password/load-secrets-action/configure@v3
+        with:
+          service-account-token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Load runner token from 1Password
+        if: env.GITHUB_PAT_TOKEN == ''
+        id: load-token
+        continue-on-error: true
+        uses: 1password/load-secrets-action@v3
+        env:
+          PERSONAL_GITHUB_TOKEN: op://${{ vars.OP_CI_VAULT }}/PERSONAL_GITHUB_TOKEN/password
+
+      - name: Determine which runner to use
+        id: set-runner
+        uses: mikehardy/runner-fallback-action@dc7732f9e532c451b2527b288ba8d58fd4b0a4ca
+        with:
+          primary-runner: ${{ inputs.primary-runner }}
+          fallback-runner: ${{ inputs.fallback-runner }}
+          github-token: "${{ env.GITHUB_PAT_TOKEN || steps.load-token.outputs.PERSONAL_GITHUB_TOKEN }}"
+          organization: ${{ github.repository_owner }}
