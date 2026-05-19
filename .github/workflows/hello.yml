@@ -1,0 +1,11 @@
+name: Hello (test reusable)
+on:
+  workflow_call:
+    outputs:
+      msg:
+        value: "hello from .github-private"
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "hello from .github-private"
