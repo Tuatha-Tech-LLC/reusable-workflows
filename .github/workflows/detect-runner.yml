@@ -59,7 +59,7 @@ jobs:
 
       - name: Determine which runner to use
         id: set-runner
-        uses: mikehardy/runner-fallback-action@dc7732f9e532c451b2527b288ba8d58fd4b0a4ca
+        uses: O-Mutt/runner-fallback-action@v2
         with:
           primary-runner: ${{ inputs.primary-runner }}
           fallback-runner: ${{ inputs.fallback-runner }}
