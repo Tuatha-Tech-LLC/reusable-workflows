@@ -24,7 +24,12 @@ on:
 
 env:
   OP_CONNECT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
-  GITHUB_PAT_TOKEN: ${{ inputs.github-pat-token }}
+  # PAT precedence: explicit input wins; otherwise look for an inherited
+  # RUNNER_FALLBACK_PAT secret; otherwise empty (1P lookup kicks in inside
+  # the steps). secrets.* is NOT accessible in a `with:` block on the
+  # calling side, so callers without 1P should pass the PAT this way:
+  #   secrets: inherit + repo/org secret named RUNNER_FALLBACK_PAT
+  GITHUB_PAT_TOKEN: ${{ inputs.github-pat-token || secrets.RUNNER_FALLBACK_PAT }}
 
 jobs:
   detect:
